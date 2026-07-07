@@ -752,6 +752,32 @@ public class TestTableMetadata {
   }
 
   @Test
+  public void testClearMetadataLog() {
+    TableMetadata initial =
+        TableMetadata.newTableMetadata(
+            TEST_SCHEMA, PartitionSpec.unpartitioned(), TEST_LOCATION, ImmutableMap.of());
+    TableMetadata located =
+        TableMetadata.buildFrom(initial)
+            .withMetadataLocation(TEST_LOCATION + "/metadata/00000.metadata.json")
+            .discardChanges()
+            .build();
+    TableMetadata withLog =
+        TableMetadata.buildFrom(located)
+            .setPreviousFileLocation(located.metadataFileLocation())
+            .setProperties(ImmutableMap.of("key", "value"))
+            .build();
+    assertThat(withLog.previousFiles()).isNotEmpty();
+
+    TableMetadata cleared = TableMetadata.buildFrom(withLog).clearMetadataLog().build();
+
+    assertThat(cleared.previousFiles()).isEmpty();
+    assertThat(cleared.uuid()).isEqualTo(withLog.uuid());
+    assertThat(cleared.location()).isEqualTo(withLog.location());
+    assertThat(cleared.schema().asStruct()).isEqualTo(withLog.schema().asStruct());
+    assertThat(cleared.properties()).containsEntry("key", "value");
+  }
+
+  @Test
   public void testAddPreviousMetadataRemoveOne() throws IOException {
     long previousSnapshotId = System.currentTimeMillis() - new Random(1234).nextInt(3600);
 

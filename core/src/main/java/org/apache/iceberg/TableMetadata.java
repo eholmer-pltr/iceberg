@@ -944,6 +944,7 @@ public class TableMetadata implements Serializable {
     private final List<HistoryEntry> snapshotLog;
     private String previousFileLocation;
     private final List<MetadataLogEntry> previousFiles;
+    private boolean clearMetadataLog = false;
 
     // indexes for convenience
     private final Map<Long, Snapshot> snapshotsById;
@@ -1539,11 +1540,26 @@ public class TableMetadata implements Serializable {
       return this;
     }
 
+    /**
+     * Clears the metadata log so that the built metadata records no previous metadata files.
+     *
+     * <p>This does not delete any metadata files from storage; it only stops the built metadata
+     * from referencing them. Callers that rely on the metadata log for metadata-file cleanup or
+     * metadata-level time travel should not use this.
+     *
+     * @return this for method chaining
+     */
+    public Builder clearMetadataLog() {
+      this.clearMetadataLog = true;
+      return this;
+    }
+
     private boolean hasChanges() {
       return changes.size() != startingChangeCount
           || (discardChanges && !changes.isEmpty())
           || metadataLocation != null
           || suppressHistoricalSnapshots
+          || clearMetadataLog
           || null != snapshotsSupplier;
     }
 
@@ -1570,7 +1586,7 @@ public class TableMetadata implements Serializable {
       SortOrder.checkCompatibility(sortOrdersById.get(defaultSortOrderId), schema);
 
       List<MetadataLogEntry> metadataHistory;
-      if (base == null) {
+      if (base == null || clearMetadataLog) {
         metadataHistory = Lists.newArrayList();
       } else {
         metadataHistory =
